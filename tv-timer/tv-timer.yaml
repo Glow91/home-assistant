@@ -1,0 +1,228 @@
+#################
+## Es müssen zuvor noch 2 Timer in den Helfern erstellt werden
+
+#################
+## Automationen
+- id: 'xxxx'
+  alias: '[TV-1] Starte Timer'
+  description: Wenn der Tv eingeschaltet wird, wird der Timer zum ausschalten gestartet.
+  trigger:
+  - type: power
+    platform: device
+    device_id: xxx
+    entity_id: xxx
+    domain: sensor
+    above: 35
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 0
+    id: power
+  - platform: state
+    entity_id:
+    - input_button.start_tv_timer
+    id: button
+  condition:
+  - condition: or
+    conditions:
+    - condition: trigger
+      id:
+      - button
+    - condition: and
+      conditions:
+      - condition: trigger
+        id:
+        - power
+      - condition: state
+        entity_id: timer.tvtimer
+        state: idle
+  action:
+  - service: timer.start
+    data: {}
+    target:
+      entity_id: timer.tvtimer
+  mode: single
+- id: 'xxxx'
+  alias: '[TV-2] Timer expired'
+  description: 'Starte AntwortTimer
+
+    Sende Nachrichten'
+  trigger:
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.tvtimer
+  condition: []
+  action:
+  - service: timer.start
+    data: {}
+    target:
+      entity_id: timer.antworttimeout
+  - service: script.tv_timer_notify
+    data: {}
+  mode: single
+- id: 'xxxx'
+  alias: '[TV-3] Reset Timer'
+  description: 'Wenn die Benachrichtigung bestätigt wird wird der Zyklus neu gestartet.
+
+    Alle Benachrichtigungen werden von den Geräten entfernt.'
+  trigger:
+  - platform: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: keepTV
+  condition: []
+  action:
+  - service: timer.start
+    data: {}
+    target:
+      entity_id: timer.tvtimer
+  - service: timer.cancel
+    data: {}
+    target:
+      entity_id: timer.antworttimeout
+  - service: script.tv_timer_revoke_notifications
+    data: {}
+  mode: single
+- id: 'xxxx'
+  alias: '[TV-4] Ausschalten'
+  description: Wenn keine Antwort von einem der Geräte kommt wir der TV ausgeschalten.
+  trigger:
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.antworttimeout
+  condition: []
+  action:
+  - type: turn_off
+    device_id: xxx
+    entity_id: xxx
+    domain: remote
+  mode: single
+- id: 'xxxx'
+  alias: '[TV-5] Timer abbrechen'
+  description: 'Wird der TV manuell ausgeschaltet werden alle Timer gestoppt und
+
+    alle Benachrichtigungen gelöscht.'
+  trigger:
+  - type: power
+    platform: device
+    device_id: xxx
+    entity_id: xxx
+    domain: sensor
+    below: 25
+  condition: []
+  action:
+  - service: timer.cancel
+    data: {}
+    target:
+      entity_id:
+      - timer.tvtimer
+      - timer.antworttimeout
+  - service: script.tv_timer_revoke_notifications
+    data: {}
+  mode: single
+
+############################
+## Scripte
+tv_timer_notify:
+  alias: 'TV Timer Notify '
+  sequence:
+  - if:
+    - condition: zone
+      entity_id: person.alex
+      zone: zone.home
+    then:
+    - service: notify.mobile_app_alexanders_iphone
+      data:
+        title: Tv Sleep
+        message: Tv wird in 5 Min ausgeschaltet
+        data:
+          tag: tvSleep
+          actions:
+          - action: keepTV
+            title: Tv eingeschaltet lassen
+    - service: notify.mobile_app_alexs_ipad
+      data:
+        title: Tv Sleep
+        message: Tv wird in 5 Min ausgeschaltet
+        data:
+          tag: tvSleep
+          actions:
+          - action: keepTV
+            title: Tv eingeschaltet lassen
+  - if:
+    - condition: zone
+      entity_id: person.jasmin
+      zone: zone.home
+    then:
+    - service: notify.mobile_app_jasmin_s_iphone
+      data:
+        title: Tv Sleep
+        message: Tv wird in 5 Min ausgeschaltet
+        data:
+          tag: tvSleep
+          actions:
+          - action: keepTV
+            title: Tv eingeschaltet lassen
+    - service: notify.mobile_app_jasmins_ipad_2
+      data:
+        title: Tv Sleep
+        message: Tv wird in 5 Min ausgeschaltet
+        data:
+          tag: tvSleep
+          actions:
+          - action: keepTV
+            title: Tv eingeschaltet lassen
+  mode: single
+tv_timer_revoke_notifications:
+  alias: TV Timer Revoke Notifications
+  sequence:
+  - if:
+    - condition: zone
+      entity_id: person.alex
+      zone: zone.home
+    then:
+    - service: notify.mobile_app_alexanders_iphone
+      data:
+        message: clear_notification
+        data:
+          tag: tvSleep
+    - service: notify.mobile_app_alexs_ipad
+      data:
+        message: clear_notification
+        data:
+          tag: tvSleep
+  - if:
+    - condition: zone
+      entity_id: person.jasmin
+      zone: zone.home
+    then:
+    - service: notify.mobile_app_jasmin_s_iphone
+      data:
+        message: clear_notification
+        data:
+          tag: tvSleep
+    - service: notify.mobile_app_jasmins_ipad_2
+      data:
+        message: clear_notification
+        data:
+          tag: tvSleep
+  mode: single
+reset_tv_timer:
+  alias: Reset TV Timer
+  sequence:
+  - service: script.tv_timer_revoke_notifications
+    data: {}
+  - service: timer.cancel
+    data: {}
+    target:
+      entity_id:
+      - timer.antworttimeout
+      - timer.tvtimer
+  - service: timer.start
+    data: {}
+    target:
+      entity_id: timer.tvtimer
+  mode: single
+  icon: mdi:reload
